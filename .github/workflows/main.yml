@@ -112,11 +112,6 @@ jobs:
       - name: Verify required secrets
         run: |
           echo "Verifying required environment variables..."
-          if [ -z "${{ secrets.MONGODB_URL_KEY }}" ]; then
-            echo "❌ ERROR: MONGODB_URL_KEY secret is not set!"
-            echo "Please add it in: Settings → Secrets and variables → Actions"
-            exit 1
-          fi
           if [ -z "${{ secrets.AWS_ECR_LOGIN_URI }}" ]; then
             echo "❌ ERROR: AWS_ECR_LOGIN_URI secret is not set!"
             exit 1
@@ -125,7 +120,13 @@ jobs:
             echo "❌ ERROR: ECR_REPOSITORY_NAME secret is not set!"
             exit 1
           fi
-          echo "✓ All required secrets are configured"
+          if [ -z "${{ secrets.MONGODB_URL_KEY }}" ]; then
+            echo "⚠ WARNING: MONGODB_URL_KEY secret is not set!"
+            echo "⚠ Training features will be disabled"
+          else
+            echo "✓ MONGODB_URL_KEY is configured"
+          fi
+          echo "✓ All critical secrets are configured"
 
       - name: Pull latest images
         run: |

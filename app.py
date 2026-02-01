@@ -7,7 +7,6 @@ ca = certifi.where()
 from dotenv import load_dotenv
 load_dotenv()
 mongo_db_url = os.getenv("MONGODB_URL_KEY")
-print(f"MongoDB URL: {mongo_db_url[:20]}..." if mongo_db_url else "MongoDB URL not found")
 
 import pymongo
 from networksecurity.exception.exception import NetworkSecurityException
@@ -26,25 +25,34 @@ from networksecurity.utils.main_utils.utils import load_object
 from networksecurity.utils.ml_utils.model.estimator import NetworkModel
 
 
-try:
-    client = pymongo.MongoClient(mongo_db_url, tlsCAFile=ca)
-    # Test connection
-    client.admin.command('ping')
-    print("MongoDB connection successful!")
-except Exception as e:
-    print(f"MongoDB connection failed: {e}")
-    client = None
+# Initialize MongoDB client as None
+client = None
+database = None
+collection = None
 
-from networksecurity.constant.training_pipeline import DATA_INGESTION_COLLECTION_NAME
-from networksecurity.constant.training_pipeline import DATA_INGESTION_DATABASE_NAME
-
-if client:
-    database = client[DATA_INGESTION_DATABASE_NAME]
-    collection = database[DATA_INGESTION_COLLECTION_NAME]
+# Try to connect to MongoDB if URL is provided
+if mongo_db_url:
+    try:
+        print(f"Attempting MongoDB connection...")
+        client = pymongo.MongoClient(mongo_db_url, tlsCAFile=ca, serverSelectionTimeoutMS=5000)
+        # Test connection
+        client.admin.command('ping')
+        print("✓ MongoDB connection successful!")
+        
+        from networksecurity.constant.training_pipeline import DATA_INGESTION_COLLECTION_NAME
+        from networksecurity.constant.training_pipeline import DATA_INGESTION_DATABASE_NAME
+        
+        database = client[DATA_INGESTION_DATABASE_NAME]
+        collection = database[DATA_INGESTION_COLLECTION_NAME]
+    except Exception as e:
+        print(f"⚠ MongoDB connection failed: {e}")
+        print("⚠ Continuing without MongoDB - training features will be disabled")
+        client = None
+        database = None
+        collection = None
 else:
-    database = None
-    collection = None
-    print("Warning: Running without MongoDB connection")
+    print("⚠ MONGODB_URL_KEY not set - running without MongoDB")
+    print("⚠ Training features will be disabled")
 
 app = FastAPI()
 origins = ["*"]
@@ -67,6 +75,9 @@ async def index():
 @app.get("/train")
 async def train_route():
     try:
+        if not client:
+            return Response("Training disabled: MongoDB connection not available. Please configure MONGODB_URL_KEY.", status_code=503)
+        
         train_pipeline=TrainingPipeline()
         train_pipeline.run_pipeline()
         return Response("Training is successful")
