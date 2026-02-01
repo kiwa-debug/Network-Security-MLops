@@ -118,20 +118,48 @@ jobs:
       - name: Wait for container to start
         run: |
           echo "Waiting for container to start..."
-          sleep 10
+          sleep 15
           
-      - name: Check container status
+      - name: Check container status and logs
         run: |
-          echo "Container status:"
+          echo "======================================"
+          echo "Container Status:"
+          echo "======================================"
           docker ps -a --filter "name=networksecurity"
           echo ""
-          echo "Container logs:"
-          docker logs networksecurity --tail 50 || true
+          echo "======================================"
+          echo "Container Logs (last 100 lines):"
+          echo "======================================"
+          docker logs networksecurity --tail 100 || true
+          echo ""
+          echo "======================================"
+          echo "Container Inspect:"
+          echo "======================================"
+          docker inspect networksecurity | grep -A 10 "State" || true
+          echo ""
+          echo "======================================"
+          echo "Checking Port 8080:"
+          echo "======================================"
+          sudo netstat -tlnp | grep 8080 || echo "Port 8080 not listening"
           
-      - name: Verify application is responding
+      - name: Verify application is responding locally
         run: |
-          echo "Checking if application is responding on port 8080..."
-          curl -f http://localhost:8080/docs || echo "Application not responding yet"
+          echo "======================================"
+          echo "Testing Local Connection:"
+          echo "======================================"
+          for i in {1..5}; do
+            echo "Attempt $i/5..."
+            if curl -f http://localhost:8080/docs 2>&1; then
+              echo "✓ Application is responding!"
+              exit 0
+            fi
+            echo "✗ Application not responding, waiting 5 seconds..."
+            sleep 5
+          done
+          echo "✗ Application failed to respond after 5 attempts"
+          echo "Showing final container logs:"
+          docker logs networksecurity --tail 200
+          exit 1
 
       - name: Clean dangling images
         run: |
