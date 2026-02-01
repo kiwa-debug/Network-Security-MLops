@@ -107,7 +107,31 @@ jobs:
 
       - name: Run Docker Image to serve users
         run: |
-          docker run -d -p 8080:8080 --ipc="host" --name=networksecurity -e 'AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}' -e 'AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}' -e 'AWS_REGION=${{ secrets.AWS_REGION }}' ${{secrets.AWS_ECR_LOGIN_URI}}/${{ secrets.ECR_REPOSITORY_NAME }}:latest
+          docker run -d -p 8080:8080 --ipc="host" --name=networksecurity \
+            -e 'AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}' \
+            -e 'AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}' \
+            -e 'AWS_REGION=${{ secrets.AWS_REGION }}' \
+            -e 'MONGODB_URL_KEY=${{ secrets.MONGODB_URL_KEY }}' \
+            --restart unless-stopped \
+            ${{secrets.AWS_ECR_LOGIN_URI}}/${{ secrets.ECR_REPOSITORY_NAME }}:latest
+
+      - name: Wait for container to start
+        run: |
+          echo "Waiting for container to start..."
+          sleep 10
+          
+      - name: Check container status
+        run: |
+          echo "Container status:"
+          docker ps -a --filter "name=networksecurity"
+          echo ""
+          echo "Container logs:"
+          docker logs networksecurity --tail 50 || true
+          
+      - name: Verify application is responding
+        run: |
+          echo "Checking if application is responding on port 8080..."
+          curl -f http://localhost:8080/docs || echo "Application not responding yet"
 
       - name: Clean dangling images
         run: |
